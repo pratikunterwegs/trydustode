@@ -103,3 +103,7 @@ dust2_filter_sirode_rng_state <- function(ptr) {
 dust2_filter_sirode_set_rng_state <- function(ptr, r_rng_state) {
   .Call(`_trydustode_dust2_filter_sirode_set_rng_state`, ptr, r_rng_state)
 }
+
+solve_mat <- function(x) {
+  .Call(`_trydustode_solve_mat`, x)
+}

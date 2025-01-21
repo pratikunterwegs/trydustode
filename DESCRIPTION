@@ -12,6 +12,7 @@ Suggests:
     testthat (>= 3.0.0)
 LinkingTo: 
     cpp11,
+    cpp11eigen,
     dust2,
     monty
 Config/testthat/edition: 3

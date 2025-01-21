@@ -187,6 +187,13 @@ extern "C" SEXP _trydustode_dust2_filter_sirode_set_rng_state(SEXP ptr, SEXP r_r
     return cpp11::as_sexp(dust2_filter_sirode_set_rng_state(cpp11::as_cpp<cpp11::decay_t<cpp11::sexp>>(ptr), cpp11::as_cpp<cpp11::decay_t<cpp11::sexp>>(r_rng_state)));
   END_CPP11
 }
+// morecode.cpp
+doubles_matrix<> solve_mat(doubles_matrix<> x);
+extern "C" SEXP _trydustode_solve_mat(SEXP x) {
+  BEGIN_CPP11
+    return cpp11::as_sexp(solve_mat(cpp11::as_cpp<cpp11::decay_t<doubles_matrix<>>>(x)));
+  END_CPP11
+}
 
 extern "C" {
 static const R_CallMethodDef CallEntries[] = {
@@ -216,6 +223,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_trydustode_dust2_unfilter_sirode_last_trajectories", (DL_FUNC) &_trydustode_dust2_unfilter_sirode_last_trajectories, 4},
     {"_trydustode_dust2_unfilter_sirode_run",               (DL_FUNC) &_trydustode_dust2_unfilter_sirode_run,               8},
     {"_trydustode_dust2_unfilter_sirode_update_pars",       (DL_FUNC) &_trydustode_dust2_unfilter_sirode_update_pars,       3},
+    {"_trydustode_solve_mat",                               (DL_FUNC) &_trydustode_solve_mat,                               1},
     {NULL, NULL, 0}
 };
 }
