@@ -30,3 +30,4 @@
 ^doc$
 ^Meta$
 ^.*cpp.sh$
+^touchstone$
