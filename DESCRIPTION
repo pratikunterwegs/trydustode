@@ -15,6 +15,9 @@ LinkingTo:
     cpp11eigen,
     dust2,
     monty
+Remotes:
+    mrc-ide/dust2,
+    mrc-ide/monty
 Config/testthat/edition: 3
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
