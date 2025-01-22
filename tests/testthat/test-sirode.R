@@ -10,3 +10,9 @@ test_that("dust system works", {
     max(diff(state$S)), 0.0
   )
 })
+
+test_that("using dust in function", {
+  expect_no_condition(
+    f()
+  )
+})
