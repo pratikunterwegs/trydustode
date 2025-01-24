@@ -1,5 +1,5 @@
 test_that("dust system works", {
-  sys <- dust2::dust_system_create(sirode, list(1, 1e6, 0.3, 0.1))
+  sys <- dust2::dust_system_create(sirode, list(1, 1e6, 0.3, 0.2, 0.1))
   dust2::dust_system_set_state_initial(sys)
 
   times <- 1:100
