@@ -6,6 +6,7 @@
 // [[dust2::parameter(I0, constant = FALSE)]]
 // [[dust2::parameter(N, constant = TRUE)]]
 // [[dust2::parameter(beta, constant = FALSE)]]
+// [[dust2::parameter(sigma, constant = FALSE)]]
 // [[dust2::parameter(gamma, constant = FALSE)]]
 class sirode {
 public:
@@ -18,6 +19,7 @@ public:
     real_type N;
     real_type I0;
     real_type beta;
+    real_type sigma;
     real_type gamma;
   };
 
@@ -29,13 +31,14 @@ public:
     real_type incidence;
   };
 
+  // unclear whether dust2/common.hpp links to monty - probably
   using rng_state_type = monty::random::generator<real_type>;
-
+  
   /// @brief How compartments are packed.
   /// @param shared A `shared_state` object, unclear why needed.
   /// @return A custom packing specification object.
   static dust2::packing packing_state(const shared_state& shared) {
-    return dust2::packing{{"S", {}}, {"I", {}}, {"R", {}}, {"cases_inc", {}}};
+    return dust2::packing{{"S", {}}, {"E", {}}, {"I", {}}, {"R", {}}, {"cases_inc", {}}};
   }
 
   /// @brief Initialise shared parameters.
@@ -45,8 +48,9 @@ public:
     const real_type I0 = dust2::r::read_real(pars, "I0", 10);
     const real_type N = dust2::r::read_real(pars, "N", 1000);
     const real_type beta = dust2::r::read_real(pars, "beta", 0.2);
+    const real_type sigma = dust2::r::read_real(pars, "sigma", 0.2);
     const real_type gamma = dust2::r::read_real(pars, "gamma", 0.1);
-    return shared_state{N, I0, beta, gamma};
+    return shared_state{N, I0, beta, sigma, gamma};
   }
 
   /// @brief Updated shared parameters.
@@ -55,6 +59,7 @@ public:
   static void update_shared(cpp11::list pars, shared_state& shared) {
     shared.I0 = dust2::r::read_real(pars, "I0", shared.I0);
     shared.beta = dust2::r::read_real(pars, "beta", shared.beta);
+    shared.sigma = dust2::r::read_real(pars, "sigma", shared.sigma);
     shared.gamma = dust2::r::read_real(pars, "gamma", shared.gamma);
   }
 
@@ -79,6 +84,11 @@ public:
                       internal_state& internal,
                       rng_state_type& rng_state,
                       real_type * state_next) {
+    state_next[0] = shared.N - shared.I0;  // S
+    state_next[1] = shared.I0;  // E
+    state_next[2] = 0.0;  // I
+    state_next[3] = 0.0;  // R
+    state_next[4] = 0.0;  // incidence
   }
 
   /// @brief RHS of the ODE model.
@@ -93,13 +103,16 @@ public:
                   internal_state& internal,
                   real_type * state_deriv) {
     const auto S = state[0];
-    const auto I = state[1];
-    const auto rate_SI = shared.beta * S * I / shared.N;
+    const auto E = state[1];
+    const auto I = state[2];
+    const auto rate_SE = shared.beta * S * I / shared.N;
+    const auto rate_EI = shared.sigma * E;
     const auto rate_IR = shared.gamma * I;
-    state_deriv[0] = -rate_SI;
-    state_deriv[1] = rate_SI - rate_IR;
-    state_deriv[2] = rate_IR;
-    state_deriv[3] = rate_SI;
+    state_deriv[0] = -rate_SE;
+    state_deriv[1] = rate_SE;
+    state_deriv[2] = rate_EI - rate_IR;
+    state_deriv[3] = rate_IR;
+    state_deriv[4] = rate_EI;
   }
 
   /// @brief Set every value to zero - unclear.
