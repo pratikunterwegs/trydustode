@@ -13,6 +13,7 @@ public:
 
   using real_type = double;
 
+  /// @brief Shared parameters and values.
   struct shared_state {
     real_type N;
     real_type I0;
@@ -20,18 +21,26 @@ public:
     real_type gamma;
   };
 
+  /// @brief Internal state - unclear purpose.
   struct internal_state {};
 
+  /// @brief Holds incidence - unclear purpose.
   struct data_type {
     real_type incidence;
   };
 
   using rng_state_type = monty::random::generator<real_type>;
 
+  /// @brief How compartments are packed.
+  /// @param shared A `shared_state` object, unclear why needed.
+  /// @return A custom packing specification object.
   static dust2::packing packing_state(const shared_state& shared) {
     return dust2::packing{{"S", {}}, {"I", {}}, {"R", {}}, {"cases_inc", {}}};
   }
 
+  /// @brief Initialise shared parameters.
+  /// @param pars A list of parameters passed from R.
+  /// @return A shared parameters object.
   static shared_state build_shared(cpp11::list pars) {
     const real_type I0 = dust2::r::read_real(pars, "I0", 10);
     const real_type N = dust2::r::read_real(pars, "N", 1000);
@@ -40,29 +49,44 @@ public:
     return shared_state{N, I0, beta, gamma};
   }
 
+  /// @brief Updated shared parameters.
+  /// @param pars A list of parameters passed from R.
+  /// @param shared A shared parameter object to update.
   static void update_shared(cpp11::list pars, shared_state& shared) {
     shared.I0 = dust2::r::read_real(pars, "I0", shared.I0);
     shared.beta = dust2::r::read_real(pars, "beta", shared.beta);
     shared.gamma = dust2::r::read_real(pars, "gamma", shared.gamma);
   }
 
+  /// @brief Return incidence data -- unclear purpose.
+  /// @param r_data A list of R data to copy.
+  /// @param shared Shared parameters -- unclear purpose.
+  /// @return Data on incidence -- unclear purpose.
   static data_type build_data(cpp11::list r_data, const shared_state& shared) {
     auto data = static_cast<cpp11::list>(r_data);
     auto incidence = dust2::r::read_real(data, "incidence", NA_REAL);
     return data_type{incidence};
   }
 
+  /// @brief Set initial values of the IVP model.
+  /// @param time Time -- not used. Purpose unclear.
+  /// @param shared Shared parameter object.
+  /// @param internal Internal state object - not used. Purpose unclear.
+  /// @param rng_state RNG state -- not used. Purpose unclear.
+  /// @param state_next Next state as double value.
   static void initial(real_type time,
                       const shared_state& shared,
                       internal_state& internal,
                       rng_state_type& rng_state,
                       real_type * state_next) {
-    state_next[0] = shared.N - shared.I0;
-    state_next[1] = shared.I0;
-    state_next[2] = 0;
-    state_next[3] = 0;
   }
 
+  /// @brief RHS of the ODE model.
+  /// @param time Time -- not used.
+  /// @param state Pointer to state.
+  /// @param shared Shared parameters.
+  /// @param internal Internal state -- purpose unclear.
+  /// @param state_deriv State change or dX.
   static void rhs(real_type time,
                   const real_type * state,
                   const shared_state& shared,
@@ -78,10 +102,21 @@ public:
     state_deriv[3] = rate_SI;
   }
 
+  /// @brief Set every value to zero - unclear.
+  /// @param shared Shared state -- unused.
+  /// @return Probably an array of zeros.
   static auto zero_every(const shared_state& shared) {
     return dust2::zero_every_type<real_type>{{1, {3}}};
   }
 
+  /// @brief Unclear what this does.
+  /// @param time 
+  /// @param state 
+  /// @param data 
+  /// @param shared 
+  /// @param internal 
+  /// @param rng_state 
+  /// @return 
   static real_type compare_data(const real_type time,
                                 const real_type * state,
                                 const data_type& data,
