@@ -7,8 +7,9 @@ Description: What the package does (one paragraph).
 License: MIT + file LICENSE
 URL: https://github.com/pratikunterwegs/trydustode
 BugReports: https://github.com/pratikunterwegs/trydustode/issues
+Imports: 
+    dust2
 Suggests: 
-    dust2,
     testthat (>= 3.0.0)
 LinkingTo: 
     cpp11,
