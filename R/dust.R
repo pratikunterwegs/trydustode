@@ -6,9 +6,9 @@ sirode <- structure(
   package = "trydustode",
   path = NULL,
   parameters = data.frame(
-    name = c("I0", "N", "beta", "sigma", "gamma"),
-    type = c("real_type", "real_type", "real_type", "real_type", "real_type"),
-    constant = c(FALSE, TRUE, FALSE, FALSE, FALSE)),
+    name = c("I0", "N", "beta", "sigma", "gamma", "n_strata"),
+    type = c("real_type", "real_type", "real_type", "real_type", "real_type", "int"),
+    constant = c(FALSE, TRUE, FALSE, FALSE, FALSE, FALSE)),
   properties = list(
     time_type = "continuous",
     has_compare = TRUE,
