@@ -3,6 +3,11 @@
 #include <dust2/common.hpp>
 #include <iterator>
 
+// hardcoded as key to model structure
+const int N_EPI_COMPARTMENTS = 4;
+const int N_DATA_COMPARTMENTS = 1;
+const int N_COMPARTMENTS = N_EPI_COMPARTMENTS + N_DATA_COMPARTMENTS;
+
 // [[dust2::class(sirode)]]
 // [[dust2::time_type(continuous)]]
 // [[dust2::has_compare()]]
@@ -99,13 +104,16 @@ public:
   static void initial(real_type time, const shared_state &shared,
                       internal_state &internal, rng_state_type &rng_state,
                       real_type *state_next) {
-    // MAP AN EIGEN CONTAINER TO STATE_NEXT AND MODIFY CONTAINER VALUES
-    state_next[0] = shared.N - shared.I0; // S
-    state_next[1] = shared.N - shared.I0; // S
-    state_next[2] = shared.I0;            // E
-    state_next[3] = 0.0;                  // I
-    state_next[4] = 0.0;                  // R
-    state_next[5] = 0.0;                  // incidence
+    size_t vec_size = shared.n_strata; // currently a single size_t
+    // map an Eigen container
+    // TODO: figure out whether this is col or row major
+    Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, N_COMPARTMENTS>> dx(
+        &state_next[0], vec_size, N_COMPARTMENTS);
+
+    // initially all zero, modify S and E
+    dx.setZero();
+    dx.col(0).setConstant(shared.N - shared.I0);
+    dx.col(1).setConstant(shared.I0);
   }
 
   /// @brief RHS of the ODE model.
@@ -117,28 +125,24 @@ public:
   static void rhs(real_type time, const real_type *state,
                   const shared_state &shared, internal_state &internal,
                   real_type *state_deriv) {
-    // MAP EIGEN CONTAINER TO STATE AND D_STATE and read and modify
-    // as in regular Eigen usage
-    const auto S = state[0];
-    const auto E = state[1];
-    const auto I = state[2];
-    const auto rate_SE = shared.beta * S * I / shared.N;
-    const auto rate_EI = shared.sigma * E;
-    const auto rate_IR = shared.gamma * I;
-    state_deriv[0] = -rate_SE;
-    state_deriv[1] = rate_SE;
-    state_deriv[2] = rate_EI - rate_IR;
-    state_deriv[3] = rate_IR;
-    state_deriv[4] = rate_EI;
 
-    // random calculation using cpp11eigen that goes nowhere
-    // Eigen::Array<double, 10, 1> x;
-    // x.setZero();
+    size_t vec_size = shared.n_strata; // currently a single size_t
+    // map an Eigen container
+    // TODO: figure out whether this is col or row major
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, N_COMPARTMENTS>> x(
+        &state[0], vec_size, N_COMPARTMENTS);
+    Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, N_COMPARTMENTS>> dx(
+        &state_deriv[0], vec_size, N_COMPARTMENTS);
 
-    // try mapping to state
-    // NOTE: needs to be mapped to const and needs state
-    Eigen::Map<const Eigen::VectorXd> y(state, 5);
-    // y.setZero();
+    const auto rate_SE =
+        shared.beta * x.col(0).array() * x.col(2).array() / shared.N;
+    const auto rate_EI = shared.sigma * x.col(1).array();
+    const auto rate_IR = shared.gamma * x.col(2).array();
+    dx.col(0) = -rate_SE;
+    dx.col(1) = rate_SE;
+    dx.col(2) = rate_EI - rate_IR;
+    dx.col(3) = rate_IR;
+    dx.col(4) = rate_EI;
   }
 
   /// @brief Set every value to zero - unclear.
