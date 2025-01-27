@@ -11,6 +11,7 @@
 // [[dust2::parameter(beta, constant = FALSE)]]
 // [[dust2::parameter(sigma, constant = FALSE)]]
 // [[dust2::parameter(gamma, constant = FALSE)]]
+// [[dust2::parameter(n_strata, constant = FALSE, type = "int")]]
 class sirode {
 public:
   sirode() = delete;
@@ -24,7 +25,7 @@ public:
     real_type beta;
     real_type sigma;
     real_type gamma;
-    size_t n_strata;
+    int n_strata;
   };
 
   /// @brief Internal state - unclear purpose.
@@ -44,12 +45,15 @@ public:
   static dust2::packing packing_state(const shared_state &shared) {
     // PASS STRATA DATA TO `shared` AND READ TO CREATE VECTORS FOR
     // PACKING VECTOR
-    const std::vector<size_t> N_STRATA(1, shared.n_strata);
-    return dust2::packing{{"S", N_STRATA},
-                          {"E", N_STRATA},
-                          {"I", N_STRATA},
-                          {"R", N_STRATA},
-                          {"cases_inc", N_STRATA}};
+    const std::vector<size_t> dim_vec(
+        1,
+        static_cast<size_t>(shared.n_strata)); // TODO: throws errors when int
+                                               // is passed instead of size_t
+    return dust2::packing{{"S", dim_vec},
+                          {"E", dim_vec},
+                          {"I", dim_vec},
+                          {"R", dim_vec},
+                          {"cases_inc", dim_vec}};
   }
 
   /// @brief Initialise shared parameters.
@@ -61,7 +65,7 @@ public:
     const real_type beta = dust2::r::read_real(pars, "beta", 0.2);
     const real_type sigma = dust2::r::read_real(pars, "sigma", 0.2);
     const real_type gamma = dust2::r::read_real(pars, "gamma", 0.1);
-    const size_t n_strata = dust2::r::read_size(pars, "n_strata", 4);
+    const int n_strata = dust2::r::read_int(pars, "n_strata", 3);
     return shared_state{N, I0, beta, sigma, gamma, n_strata};
   }
 
@@ -73,7 +77,7 @@ public:
     shared.beta = dust2::r::read_real(pars, "beta", shared.beta);
     shared.sigma = dust2::r::read_real(pars, "sigma", shared.sigma);
     shared.gamma = dust2::r::read_real(pars, "gamma", shared.gamma);
-    shared.n_strata = dust2::r::read_real(pars, "n_strata", shared.n_strata);
+    shared.n_strata = dust2::r::read_int(pars, "n_strata", shared.n_strata);
   }
 
   /// @brief Return incidence data -- unclear purpose.
