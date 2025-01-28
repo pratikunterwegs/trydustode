@@ -149,7 +149,8 @@ public:
   /// @param shared Shared state -- unused.
   /// @return Probably an array of zeros.
   static auto zero_every(const shared_state &shared) {
-    return dust2::zero_every_type<real_type>{{1, {3}}};
+    return dust2::zero_every_type<real_type>{
+        {1, {}}}; // unclear what value this should be
   }
 
   /// @brief Unclear what this does.
