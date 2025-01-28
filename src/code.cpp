@@ -135,6 +135,8 @@ public:
         &state[0], vec_size, N_COMPARTMENTS);
     Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, N_COMPARTMENTS>> dx(
         &state_deriv[0], vec_size, N_COMPARTMENTS);
+    // dx does not need to be set to zero as this is handled by zero_every()
+    // seems like
 
     const auto rate_SE =
         shared.beta * x.col(0).array() * x.col(2).array() / shared.N;
@@ -151,7 +153,8 @@ public:
   /// @param shared Shared state -- unused.
   /// @return Probably an array of zeros.
   static auto zero_every(const shared_state &shared) {
-    return dust2::zero_every_type<real_type>{{1, {}}}; // unclear what value this should be
+    return dust2::zero_every_type<real_type>{
+        {1, {}}}; // unclear what value this should be
   }
 
   /// @brief Unclear what this does.
