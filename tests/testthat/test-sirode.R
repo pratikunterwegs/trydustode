@@ -7,7 +7,8 @@ test_that("dust system works", {
   state <- dust2::dust_unpack_state(sys, state)
 
   expect_lte(
-    max(diff(state$S)), 0.0
+    max(diff(state$S)),
+    0.0
   )
 })
 

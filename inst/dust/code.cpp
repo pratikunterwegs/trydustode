@@ -2,6 +2,7 @@
 #include <cpp11eigen.hpp>
 #include <dust2/common.hpp>
 #include <iterator>
+#include <iostream>
 
 // hardcoded as key to model structure
 const int N_EPI_COMPARTMENTS = 4;
@@ -10,7 +11,6 @@ const int N_COMPARTMENTS = N_EPI_COMPARTMENTS + N_DATA_COMPARTMENTS;
 
 // [[dust2::class(sirode)]]
 // [[dust2::time_type(continuous)]]
-// [[dust2::has_compare()]]
 // [[dust2::parameter(I0, constant = FALSE)]]
 // [[dust2::parameter(N, constant = TRUE)]]
 // [[dust2::parameter(beta, constant = FALSE)]]
@@ -34,7 +34,13 @@ public:
   };
 
   /// @brief Internal state - unclear purpose.
-  struct internal_state {};
+  struct internal_state {
+    double beta;
+  };
+
+  static internal_state build_internal(const shared_state &shared) {
+    return internal_state{shared.beta};
+  }
 
   /// @brief Holds incidence - unclear purpose.
   struct data_type {
@@ -137,7 +143,7 @@ public:
     // seems like
 
     const auto rate_SE =
-        shared.beta * x.col(0).array() * x.col(2).array() / shared.N;
+        internal.beta * x.col(0).array() * x.col(2).array() / shared.N;
     const auto rate_EI = shared.sigma * x.col(1).array();
     const auto rate_IR = shared.gamma * x.col(2).array();
     dx.col(0) = -rate_SE;
@@ -155,24 +161,23 @@ public:
         {1, {}}}; // unclear what value this should be
   }
 
-  /// @brief Unclear what this does.
-  /// @param time
-  /// @param state
-  /// @param data
-  /// @param shared
-  /// @param internal
-  /// @param rng_state
-  /// @return
-  static real_type compare_data(const real_type time, const real_type *state,
-                                const data_type &data,
-                                const shared_state &shared,
-                                internal_state &internal,
-                                rng_state_type &rng_state) {
-    const auto incidence_observed = data.incidence;
-    if (std::isnan(incidence_observed)) {
-      return 0;
-    }
-    const auto lambda = state[3];
-    return monty::density::poisson(incidence_observed, lambda, true);
+  /// @brief Events for daedalus.
+  /// @param shared Shared parameters.
+  /// @param internal Intermediate containers.
+  /// @return A container of events passed to the solver.
+  static auto events(const shared_state &shared, internal_state &internal) {
+    // check for state 0 for now
+    auto test = [&](double t, const double *y) {
+      double diff = y[0] - 20.0;  // check if root re: infected
+
+      return diff;
+    };
+
+    auto action = [&](const double t, const double sign, double *y) {
+      internal.beta *= 0.5;
+    };
+
+    dust2::ode::event<real_type> e({1}, test, action);
+    return dust2::ode::events_type<real_type>({e});
   }
 };

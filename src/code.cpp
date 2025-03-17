@@ -4,6 +4,7 @@
 #include <cpp11eigen.hpp>
 #include <dust2/common.hpp>
 #include <iterator>
+#include <iostream>
 
 // hardcoded as key to model structure
 const int N_EPI_COMPARTMENTS = 4;
@@ -12,7 +13,6 @@ const int N_COMPARTMENTS = N_EPI_COMPARTMENTS + N_DATA_COMPARTMENTS;
 
 // [[dust2::class(sirode)]]
 // [[dust2::time_type(continuous)]]
-// [[dust2::has_compare()]]
 // [[dust2::parameter(I0, constant = FALSE)]]
 // [[dust2::parameter(N, constant = TRUE)]]
 // [[dust2::parameter(beta, constant = FALSE)]]
@@ -36,7 +36,13 @@ public:
   };
 
   /// @brief Internal state - unclear purpose.
-  struct internal_state {};
+  struct internal_state {
+    double beta;
+  };
+
+  static internal_state build_internal(const shared_state &shared) {
+    return internal_state{shared.beta};
+  }
 
   /// @brief Holds incidence - unclear purpose.
   struct data_type {
@@ -139,7 +145,7 @@ public:
     // seems like
 
     const auto rate_SE =
-        shared.beta * x.col(0).array() * x.col(2).array() / shared.N;
+        internal.beta * x.col(0).array() * x.col(2).array() / shared.N;
     const auto rate_EI = shared.sigma * x.col(1).array();
     const auto rate_IR = shared.gamma * x.col(2).array();
     dx.col(0) = -rate_SE;
@@ -157,32 +163,29 @@ public:
         {1, {}}}; // unclear what value this should be
   }
 
-  /// @brief Unclear what this does.
-  /// @param time
-  /// @param state
-  /// @param data
-  /// @param shared
-  /// @param internal
-  /// @param rng_state
-  /// @return
-  static real_type compare_data(const real_type time, const real_type *state,
-                                const data_type &data,
-                                const shared_state &shared,
-                                internal_state &internal,
-                                rng_state_type &rng_state) {
-    const auto incidence_observed = data.incidence;
-    if (std::isnan(incidence_observed)) {
-      return 0;
-    }
-    const auto lambda = state[3];
-    return monty::density::poisson(incidence_observed, lambda, true);
+  /// @brief Events for daedalus.
+  /// @param shared Shared parameters.
+  /// @param internal Intermediate containers.
+  /// @return A container of events passed to the solver.
+  static auto events(const shared_state &shared, internal_state &internal) {
+    // check for state 0 for now
+    auto test = [&](double t, const double *y) {
+      double diff = y[0] - 20.0;  // check if root re: infected
+
+      return diff;
+    };
+
+    auto action = [&](const double t, const double sign, double *y) {
+      internal.beta *= 0.5;
+    };
+
+    dust2::ode::event<real_type> e({1}, test, action);
+    return dust2::ode::events_type<real_type>({e});
   }
 };
 
 #include <cpp11.hpp>
 #include <dust2/r/continuous/system.hpp>
-#include <dust2/r/continuous/filter.hpp>
-#include <dust2/r/continuous/unfilter.hpp>
 
 [[cpp11::register]]
 SEXP dust2_system_sirode_alloc(cpp11::list r_pars, cpp11::sexp r_time, cpp11::list r_time_control, cpp11::sexp r_n_particles, cpp11::sexp r_n_groups, cpp11::sexp r_seed, cpp11::sexp r_deterministic, cpp11::sexp r_n_threads) {
@@ -246,68 +249,4 @@ SEXP dust2_system_sirode_update_pars(cpp11::sexp ptr, cpp11::list pars) {
 [[cpp11::register]]
 SEXP dust2_system_sirode_simulate(cpp11::sexp ptr, cpp11::sexp r_times, cpp11::sexp r_index_state, bool preserve_particle_dimension, bool preserve_group_dimension) {
   return dust2::r::dust2_system_simulate<dust2::dust_continuous<sirode>>(ptr, r_times, r_index_state, preserve_particle_dimension, preserve_group_dimension);
-}
-
-[[cpp11::register]]
-SEXP dust2_unfilter_sirode_alloc(cpp11::list r_pars, cpp11::sexp r_time_start, cpp11::sexp r_time, cpp11::list r_time_control, cpp11::list r_data, cpp11::sexp r_n_particles, cpp11::sexp r_n_groups, cpp11::sexp r_n_threads) {
-  return dust2::r::dust2_continuous_unfilter_alloc<sirode>(r_pars, r_time_start, r_time, r_time_control, r_data, r_n_particles, r_n_groups, r_n_threads);
-}
-
-[[cpp11::register]]
-SEXP dust2_filter_sirode_alloc(cpp11::list r_pars, cpp11::sexp r_time_start, cpp11::sexp r_time, cpp11::list r_time_control, cpp11::list r_data, cpp11::sexp r_n_particles, cpp11::sexp r_n_groups, cpp11::sexp r_n_threads, cpp11::sexp r_seed) {
-  return dust2::r::dust2_continuous_filter_alloc<sirode>(r_pars, r_time_start, r_time, r_time_control, r_data, r_n_particles, r_n_groups, r_n_threads, r_seed);
-}
-[[cpp11::register]]
-SEXP dust2_system_sirode_compare_data(cpp11::sexp ptr, cpp11::list r_data, bool preserve_particle_dimension, bool preserve_group_dimension) {
-  return dust2::r::dust2_system_compare_data<dust2::dust_continuous<sirode>>(ptr, r_data, preserve_particle_dimension, preserve_group_dimension);
-}
-
-[[cpp11::register]]
-SEXP dust2_unfilter_sirode_update_pars(cpp11::sexp ptr, cpp11::list r_pars, cpp11::sexp r_index_group) {
-  return dust2::r::dust2_unfilter_update_pars<dust2::dust_continuous<sirode>>(ptr, r_pars, r_index_group);
-}
-
-[[cpp11::register]]
-SEXP dust2_unfilter_sirode_run(cpp11::sexp ptr, cpp11::sexp r_initial, bool save_history, bool adjoint, cpp11::sexp r_index_state, cpp11::sexp r_index_group, bool preserve_particle_dimension, bool preserve_group_dimension) {
-  return dust2::r::dust2_unfilter_run<dust2::dust_continuous<sirode>>(ptr, r_initial, save_history, adjoint, r_index_state, r_index_group, preserve_particle_dimension, preserve_group_dimension);
-}
-
-[[cpp11::register]]
-SEXP dust2_unfilter_sirode_last_trajectories(cpp11::sexp ptr, bool select_random_particle, bool preserve_particle_dimension, bool preserve_group_dimension) {
-  return dust2::r::dust2_unfilter_last_trajectories<dust2::dust_continuous<sirode>>(ptr, select_random_particle, preserve_particle_dimension, preserve_group_dimension);
-}
-
-[[cpp11::register]]
-SEXP dust2_unfilter_sirode_last_state(cpp11::sexp ptr, bool select_random_particle, bool preserve_particle_dimension, bool preserve_group_dimension) {
-  return dust2::r::dust2_unfilter_last_state<dust2::dust_continuous<sirode>>(ptr, select_random_particle, preserve_particle_dimension, preserve_group_dimension);
-}
-
-[[cpp11::register]]
-SEXP dust2_filter_sirode_update_pars(cpp11::sexp ptr, cpp11::list r_pars, cpp11::sexp r_index_group) {
-  return dust2::r::dust2_filter_update_pars<dust2::dust_continuous<sirode>>(ptr, r_pars, r_index_group);
-}
-
-[[cpp11::register]]
-SEXP dust2_filter_sirode_run(cpp11::sexp ptr, cpp11::sexp r_initial, bool save_history, bool adjoint, cpp11::sexp index_state, cpp11::sexp index_group, bool preserve_particle_dimension, bool preserve_group_dimension) {
-  return dust2::r::dust2_filter_run<dust2::dust_continuous<sirode>>(ptr, r_initial, save_history, adjoint, index_state, index_group, preserve_particle_dimension, preserve_group_dimension);
-}
-
-[[cpp11::register]]
-SEXP dust2_filter_sirode_last_trajectories(cpp11::sexp ptr, bool select_random_particle, bool preserve_particle_dimension, bool preserve_group_dimension) {
-  return dust2::r::dust2_filter_last_trajectories<dust2::dust_continuous<sirode>>(ptr, select_random_particle, preserve_particle_dimension, preserve_group_dimension);
-}
-
-[[cpp11::register]]
-SEXP dust2_filter_sirode_last_state(cpp11::sexp ptr, bool select_random_particle, bool preserve_particle_dimension, bool preserve_group_dimension) {
-  return dust2::r::dust2_filter_last_state<dust2::dust_continuous<sirode>>(ptr, select_random_particle, preserve_particle_dimension, preserve_group_dimension);
-}
-
-[[cpp11::register]]
-SEXP dust2_filter_sirode_rng_state(cpp11::sexp ptr) {
-  return dust2::r::dust2_filter_rng_state<dust2::dust_continuous<sirode>>(ptr);
-}
-
-[[cpp11::register]]
-SEXP dust2_filter_sirode_set_rng_state(cpp11::sexp ptr, cpp11::sexp r_rng_state) {
-  return dust2::r::dust2_filter_set_rng_state<dust2::dust_continuous<sirode>>(ptr, r_rng_state);
 }
