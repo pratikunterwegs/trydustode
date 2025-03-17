@@ -160,7 +160,7 @@ public:
   /// @return Probably an array of zeros.
   static auto zero_every(const shared_state &shared) {
     return dust2::zero_every_type<real_type>{
-        {1, {}}}; // unclear what value this should be
+        {1, {}}}; // zero only first three - works for single stratum
   }
 
   /// @brief Events for daedalus.
@@ -168,7 +168,7 @@ public:
   /// @param internal Intermediate containers.
   /// @return A container of events passed to the solver.
   static auto events(const shared_state &shared, internal_state &internal) {
-    // check for state 0 for now
+    // event for state controlled modification
     auto test = [&](double t, const double *y) {
       double diff = y[0] - 20.0;  // check if root re: infected
 
@@ -178,9 +178,21 @@ public:
     auto action = [&](const double t, const double sign, double *y) {
       internal.beta *= 0.5;
     };
-
     dust2::ode::event<real_type> e({1}, test, action);
-    return dust2::ode::events_type<real_type>({e});
+
+    // event for time controlled modification
+    auto test_time = [&](double t, const double *y) {
+      double diff = std::abs(t - 20.0);  // check if root re: time
+
+      return diff;
+    };
+
+    auto action_time = [&](const double t, const double sign, double *y) {
+      internal.beta = 0.0;
+    };
+    dust2::ode::event<real_type> e_time({}, test_time, action_time);
+    
+    return dust2::ode::events_type<real_type>({e_time});
   }
 };
 
