@@ -25,6 +25,5 @@ touchstone::benchmark_run(
 #   n = 6
 # )
 
-
 # create artifacts used downstream in the GitHub Action
 touchstone::benchmark_analyze()
