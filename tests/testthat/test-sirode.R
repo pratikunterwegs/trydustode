@@ -14,6 +14,6 @@ test_that("dust system works", {
 
 test_that("using dust in function", {
   expect_no_condition(
-    f()
+    fsir()
   )
 })

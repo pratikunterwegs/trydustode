@@ -1,8 +1,8 @@
 #include <cpp11.hpp>
 #include <cpp11eigen.hpp>
 #include <dust2/common.hpp>
-#include <iterator>
 #include <iostream>
+#include <iterator>
 
 // hardcoded as key to model structure
 const int N_EPI_COMPARTMENTS = 4;
@@ -30,7 +30,6 @@ public:
     real_type beta;
     real_type sigma;
     real_type gamma;
-    int n_strata;
   };
 
   /// @brief Internal state - unclear purpose.
@@ -56,15 +55,10 @@ public:
   static dust2::packing packing_state(const shared_state &shared) {
     // PASS STRATA DATA TO `shared` AND READ TO CREATE VECTORS FOR
     // PACKING VECTOR
-    const std::vector<size_t> dim_vec(
-        1,
-        static_cast<size_t>(shared.n_strata)); // TODO: throws errors when int
-                                               // is passed instead of size_t
-    return dust2::packing{{"S", dim_vec},
-                          {"E", dim_vec},
-                          {"I", dim_vec},
-                          {"R", dim_vec},
-                          {"cases_inc", dim_vec}};
+    const std::vector<size_t> dim_vec(1, 1);
+    const std::vector<size_t> dim_flag(1, 1);
+    return dust2::packing{{"S", {}}, {"E", {}},         {"I", {}},
+                          {"R", {}}, {"cases_inc", {}}, {"flag", {}}};
   }
 
   /// @brief Initialise shared parameters.
@@ -76,8 +70,7 @@ public:
     const real_type beta = dust2::r::read_real(pars, "beta", 0.2);
     const real_type sigma = dust2::r::read_real(pars, "sigma", 0.2);
     const real_type gamma = dust2::r::read_real(pars, "gamma", 0.1);
-    const int n_strata = dust2::r::read_int(pars, "n_strata", 3);
-    return shared_state{N, I0, beta, sigma, gamma, n_strata};
+    return shared_state{N, I0, beta, sigma, gamma};
   }
 
   /// @brief Updated shared parameters.
@@ -88,17 +81,6 @@ public:
     shared.beta = dust2::r::read_real(pars, "beta", shared.beta);
     shared.sigma = dust2::r::read_real(pars, "sigma", shared.sigma);
     shared.gamma = dust2::r::read_real(pars, "gamma", shared.gamma);
-    shared.n_strata = dust2::r::read_int(pars, "n_strata", shared.n_strata);
-  }
-
-  /// @brief Return incidence data -- unclear purpose.
-  /// @param r_data A list of R data to copy.
-  /// @param shared Shared parameters -- unclear purpose.
-  /// @return Data on incidence -- unclear purpose.
-  static data_type build_data(cpp11::list r_data, const shared_state &shared) {
-    auto data = static_cast<cpp11::list>(r_data);
-    auto incidence = dust2::r::read_real(data, "incidence", NA_REAL);
-    return data_type{incidence};
   }
 
   /// @brief Set initial values of the IVP model.
@@ -110,11 +92,13 @@ public:
   static void initial(real_type time, const shared_state &shared,
                       internal_state &internal, rng_state_type &rng_state,
                       real_type *state_next) {
-    size_t vec_size = shared.n_strata; // currently a single size_t
+    // a response flag
+    state_next[N_COMPARTMENTS] = 0.0;
+
     // map an Eigen container
     // TODO: figure out whether this is col or row major
     Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, N_COMPARTMENTS>> dx(
-        &state_next[0], vec_size, N_COMPARTMENTS);
+        &state_next[0], 1, N_COMPARTMENTS);
 
     // initially all zero, modify S and E
     dx.setZero();
@@ -132,22 +116,20 @@ public:
                   const shared_state &shared, internal_state &internal,
                   real_type *state_deriv) {
 
-    size_t vec_size = shared.n_strata; // currently a single size_t
     // map an Eigen container
-    // TODO: figure out whether this is col or row major
     Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, N_COMPARTMENTS>> x(
-        &state[0], vec_size, N_COMPARTMENTS);
+        &state[0], 1, N_COMPARTMENTS);
     Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, N_COMPARTMENTS>> dx(
-        &state_deriv[0], vec_size, N_COMPARTMENTS);
+        &state_deriv[0], 1, N_COMPARTMENTS);
     // dx does not need to be set to zero as this is handled by zero_every()
     // seems like
 
     const auto rate_SE =
-        internal.beta * x.col(0).array() * x.col(2).array() / shared.N;
+        shared.beta * x.col(0).array() * x.col(2).array() / shared.N;
     const auto rate_EI = shared.sigma * x.col(1).array();
     const auto rate_IR = shared.gamma * x.col(2).array();
     dx.col(0) = -rate_SE;
-    dx.col(1) = rate_SE;
+    dx.col(1) = rate_SE - rate_EI;
     dx.col(2) = rate_EI - rate_IR;
     dx.col(3) = rate_IR;
     dx.col(4) = rate_EI;
@@ -158,7 +140,7 @@ public:
   /// @return Probably an array of zeros.
   static auto zero_every(const shared_state &shared) {
     return dust2::zero_every_type<real_type>{
-        {1, {}}}; // zero only first three - works for single stratum
+        {1, {4}}}; // zero only first three - works for single stratum
   }
 
   /// @brief Events for daedalus.
@@ -166,31 +148,31 @@ public:
   /// @param internal Intermediate containers.
   /// @return A container of events passed to the solver.
   static auto events(const shared_state &shared, internal_state &internal) {
-    // event for state controlled modification
+    // check exposed and trigger event on root = 50 (prevalence)
     auto test = [&](double t, const double *y) {
-      double diff = y[0] - 20.0;  // check if root re: infected
+      double diff = y[0] - 50.0; // check if root re: infected
 
       return diff;
     };
 
     auto action = [&](const double t, const double sign, double *y) {
-      internal.beta *= 0.5;
+      y[5] = 1.0; // set flag on
     };
-    dust2::ode::event<real_type> e({1}, test, action);
+    dust2::ode::event<real_type> e({1}, test, action,
+                                   dust2::ode::root_type::increase);
 
-    // // time controlled events do not seem to work
-    // // event for time controlled modification
-    // auto test_time = [&](double t, const double *y) {
-    //   double diff = std::abs(t - 20.0);  // check if root re: time
+    // check recovered and trigger event on root = 600 (epidemic size)
+    auto test2 = [&](double t, const double *y) {
+      double diff = y[0] - 600.0; // check if root re: infected
 
-    //   return diff;
-    // };
+      return diff;
+    };
 
-    // auto action_time = [&](const double t, const double sign, double *y) {
-    //   internal.beta = 0.0;
-    // };
-    // dust2::ode::event<real_type> e_time({}, test_time, action_time);
-    
-    return dust2::ode::events_type<real_type>({e});
+    auto action2 = [&](const double t, const double sign, double *y) {
+      y[5] = 0.0; // set flag off
+    };
+    dust2::ode::event<real_type> e2({3}, test, action);
+
+    return dust2::ode::events_type<real_type>({e, e2});
   }
 };

@@ -1,16 +1,9 @@
-#' Create a dust2 system
-#'
-#' @export
-f <- function() {
-  dust2::dust_system_create(sirode)
-}
-
 #' Small SIR function using dust2
 #'
 #' @param times A vector of times.
 #' @export
-f2 <- function(times = 0:10) {
-  sys <- dust2::dust_system_create(sirode, pars = list(n_strata = 1))
+fsir <- function(times = 0:10) {
+  sys <- dust2::dust_system_create(sirode)
   dust2::dust_system_set_state_initial(sys)
   state <- dust2::dust_system_simulate(sys, times)
   state <- dust2::dust_unpack_state(sys, state)
